@@ -1,23 +1,29 @@
+"""
+app.py  – FastAPI wrapper exposing POST /ask
+Author: Brandon Desbiens
+"""
+
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from ask import retrieve, llm, SYSTEM
+from chat import answer
 
-app = FastAPI(title="PAD Chat Bot")
+app = FastAPI(title="PAD Chat Bot API")
 
+# configurable CORS
+origins = os.getenv("ALLOWED_ORIGINS", "*") # comma-sep in prod
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=[o.strip() for o in origins.split(",")],
+    allow_methods=["POST"],
     allow_headers=["*"],
 )
 
+# request / response model
 class Query(BaseModel):
     question: str
 
 @app.post("/ask")
 def ask_route(q: Query):
-    ctx = "\n\n".join(d.page_content for d in retrieve(q.question))
-    prompt = f"{SYSTEM}\n\nContext:\n{ctx}\n\nQuestion: {q.question}\n\nAnswer:"
-    response = llm.invoke(prompt)
-    return {"answer": response}
+    return {"answer": answer(q.question)}

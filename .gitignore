@@ -1,0 +1,10 @@
+# compiled / runtime artefacts
+__pycache__/
+.venv/
+
+# big binaries (regenerate or scp)
+pad.pdf
+pad.index
+pad_chunks.pkl
+*.gguf
+pad-lora/
