@@ -1,15 +1,19 @@
 """
-ingest.py  –  build the FAISS index
+ingest.py  – build the FAISS index
 Author: Brandon Desbiens
 
-Run this once (or whenever pad.pdf changes) to build the FAISS
-vector index used by the chatbot.
+Run this once (or whenever pad.pdf changes) to create:
+* pad.index  – FAISS vectors for similarity search
+* pad_chunks.pkl – list of text chunks with metadata
 
-Pipeline:
-1) Load every PDF listed in config.DOC_PATHS (currently just pad.pdf).
-2) Split each page into ~300-char chunks with 50-char overlap.
-3) Embed the chunks with MiniLM.
-4) Store the vectors in a FAISS IndexFlatL2 and pickle the chunks list.
+Steps
+1. Read each PDF named in config (today just pad.pdf).
+2. Split every page into ~300-char overlaps (RecursiveTextSplitter).
+3. Embed each chunk with MiniLM.
+4. Add vectors to a FAISS IndexFlatL2.
+5. Persist index + chunks to disk.
+
+You only need to re-run if you add the French PAD or change chunking.
 """
 
 import pickle, faiss, numpy as np, re
@@ -36,7 +40,7 @@ embed   = HuggingFaceEmbeddings(model_name=config.EMBED_MODEL)
 vectors = np.array(embed.embed_documents([c.page_content for c in chunks]),
                    dtype="float32")
 
-# ––– build FAISS index ––––––––––––––––––––––––––––––––––––––––––––––––
+# build FAISS index
 index = faiss.IndexFlatL2(vectors.shape[1])
 index.add(vectors)
 

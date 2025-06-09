@@ -27,4 +27,4 @@ OLLAMA_URL   = "http://localhost:11434"
 OLLAMA_MODEL = "mistral:7b-instruct"
 EMBED_MODEL  = "sentence-transformers/all-MiniLM-L6-v2"
 TOP_K = 4 # Number of chunks to stuff into prompt
-LLM_TEMPERATURE = 0.2
+LLM_TEMPERATURE = 0.2 # Low temperature keeps answers "professional" and less "chatty/friendly"
