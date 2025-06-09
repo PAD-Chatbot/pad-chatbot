@@ -16,34 +16,65 @@ Steps
 You only need to re-run if you add the French PAD or change chunking.
 """
 
-import pickle, faiss, numpy as np, re
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+import pickle
+import re
+from pathlib import Path
+
+import faiss
+import numpy as np
+from pypdf import PdfReader
+from langchain.docstore.document import Document
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
+
 import config
 
-# load & tag pages
-splitter = RecursiveCharacterTextSplitter(chunk_size=300, chunk_overlap=50)
-pages = []
+# read PDF(s) and keep page numbers
+reader_en = PdfReader(str(config.PDF_PATH))
+docs: list[Document] = []
 
-for path in [config.PDF_PATH]: # extend list later for FR doc
-    lang = "fr" if re.search(r"_fr\.pdf$", path.name, re.I) else "en"
-    for page in PyPDFLoader(str(path)).load():
-        page.metadata["lang"] = lang  # keep track of language
-        pages.append(page)
+splitter = RecursiveCharacterTextSplitter(
+    chunk_size=300,
+    chunk_overlap=50,
+    length_function=len,
+)
 
-print(f"[ingest] loaded {len(pages)} pages")
+def add_pdf(path: Path, language: str) -> None:
+# Extract every page, split to chunks, store page# + lang metadata.
+    reader = PdfReader(str(path))
+    for pg_num, page in enumerate(reader.pages, start=1):
+        text = page.extract_text() or ""
+        for chunk in splitter.split_text(text):
+            docs.append(
+                Document(
+                    page_content=chunk,
+                    metadata={"page": pg_num, "lang": language},
+                )
+            )
 
-# chunk & embed
-chunks  = splitter.split_documents(pages)
-embed   = HuggingFaceEmbeddings(model_name=config.EMBED_MODEL)
-vectors = np.array(embed.embed_documents([c.page_content for c in chunks]),
-                   dtype="float32")
+add_pdf(config.PDF_PATH, "en")
 
-# build FAISS index
-index = faiss.IndexFlatL2(vectors.shape[1])
-index.add(vectors)
+# If you later supply a French PAD (e.g., pad_fr.pdf) just drop it in
+# the repo and uncomment / adapt these two lines:
+# fr_path = config.BASE_DIR / "pad_fr.pdf"
+# if fr_path.exists(): add_pdf(fr_path, "fr")
+
+print(f"[ingest] produced {len(docs):,} text chunks")
+
+
+# embed chunks with MiniLM (or whichever model is in config)
+embedder = HuggingFaceEmbeddings(model_name=config.EMBED_MODEL)
+embeddings = np.array(
+    embedder.embed_documents([d.page_content for d in docs]),
+    dtype="float32",
+)
+
+# write FAISS index + pickle
+index = faiss.IndexFlatL2(embeddings.shape[1])
+index.add(embeddings)
 
 faiss.write_index(index, str(config.INDEX_FILE))
-pickle.dump(chunks, open(config.CHUNK_FILE, "wb"))
-print(f"[ingest] wrote {config.INDEX_FILE.name} and {config.CHUNK_FILE.name}")
+pickle.dump(docs, open(config.CHUNK_FILE, "wb"))
+
+print(f"[ingest] wrote {config.INDEX_FILE.name}  ({index.ntotal} vectors)")
+print(f"[ingest] wrote {config.CHUNK_FILE.name}  ({len(docs)} chunks)")
