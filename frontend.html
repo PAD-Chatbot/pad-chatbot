@@ -2,22 +2,150 @@
 <html lang="en">
 <meta charset="utf-8" />
 <title>PAD Chat Bot</title>
+
+<!-- CSS -->
 <style>
- body{font-family:sans-serif;max-width:600px;margin:40px auto}
- textarea{width:100%;height:80px}
- pre{background:#eee;padding:8px}
+  :root {
+    --blue: #007ACC; /* accent blue */
+    --blue-dark: #005a99; /* button hover */
+    --bg: #ffffff; /* main background */
+    --fg: #111111; /* primary text */
+    --bubble-bg: #f3f7ff; /* bot bubble */
+    --user-bg: #e9ecef; /* user bubble */
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0 auto;
+    max-width: 720px;
+    padding: 2rem 1rem 4rem;
+    font: 16px/1.5 "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+  }
+  h1 {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    margin: 0 0 0.25rem;
+  }
+  h1 img { width: 36px; height: 36px; }
+  h2 { text-align: center; font-weight: 400; color: var(--blue); margin: 0 0 1.2rem; }
+
+  /* chat area */
+  #chat {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: 65vh;
+    overflow-y: auto;
+    padding-right: 4px; /* reserve space for scrollbar */
+    margin-bottom: 1.25rem;
+  }
+  .bubble {
+    white-space: pre-wrap; /* wrap long lines */
+    word-break: break-word; /* break long tokens */
+    border-radius: 8px;
+    padding: 12px 16px;
+    line-height: 1.55;
+  }
+  .bot  { background: var(--bubble-bg); }
+  .user { background: var(--user-bg); align-self: flex-end; }
+
+  /* form */
+  form {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  textarea {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
+  }
+  button {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 18px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.6; cursor: wait; }
+  button:hover:not(:disabled) { background: var(--blue-dark); }
+
+  /* focus visible for keyboard nav */
+  textarea:focus-visible,
+  button:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 </style>
-<h2>Ask the PAD</h2>
-<textarea id="q" placeholder="Type a question…"></textarea><br>
-<button onclick="ask()">Send</button>
-<pre id="out"></pre>
+
+<!-- HEADER -->
+<h1>
+  <img src="https://img.icons8.com/fluency/48/chat--v1.png"
+       alt="" aria-hidden="true">
+  PAD Chatbot
+</h1>
+<h2>Ask about the Project Approval Directive (PAD)</h2>
+
+<!-- CHAT SCROLL AREA -->
+<main id="chat" role="log" aria-live="polite"></main>
+
+<!-- QUESTION FORM -->
+<form id="askForm" aria-label="Ask a question">
+  <label class="visually-hidden" for="q">Your question</label>
+  <textarea id="q" required placeholder="Type your PAD question here…"></textarea>
+  <button id="sendBtn">Submit</button>
+</form>
+
+<!-- small helper class for off-screen labels -->
+<style>
+  .visually-hidden{position:absolute;left:-10000px}
+</style>
+
+<!-- JS -->
 <script>
-const API="http://localhost:8000/ask"; // swap to VM URL in prod
-async function ask(){
-  const q=document.getElementById("q").value;
-  const r=await fetch(API,{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({question:q})}).then(r=>r.json());
-  document.getElementById("out").textContent=r.answer;
+const API = "http://localhost:8000/ask"; // replace with EC2 URL later
+const chat   = document.getElementById("chat");
+const qBox   = document.getElementById("q");
+const form   = document.getElementById("askForm");
+const sendBtn = document.getElementById("sendBtn");
+
+form.addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  const text = qBox.value.trim();
+  if (!text) return;
+  addBubble(text,"user");
+  qBox.value="";
+  qBox.focus();
+  sendBtn.disabled=true;
+
+  try{
+    const rsp = await fetch(API,{
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body:JSON.stringify({ question:text })
+    });
+    const data = await rsp.json();
+    addBubble(data.answer,"bot");
+  }catch(err){
+    addBubble("Error: "+err.message,"bot");
+  }finally{
+    sendBtn.disabled=false;
+    chat.scrollTop = chat.scrollHeight; // jump to the newest message
+  }
+});
+
+function addBubble(txt,who){
+  const div=document.createElement("div");
+  div.className="bubble "+who;
+  div.textContent=txt;
+  chat.appendChild(div);
 }
 </script>
+</html>

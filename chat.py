@@ -32,7 +32,7 @@ llm = ChatOllama(
     model       = config.OLLAMA_MODEL,
     base_url    = config.OLLAMA_URL,
     temperature = config.LLM_TEMPERATURE,
-    lora_path   = os.getenv("OLLAMA_LORA_PATH"),  # set only if you train LoRA
+    lora_path   = os.getenv("OLLAMA_LORA_PATH"),
 )
 
 _SYSTEM = (
